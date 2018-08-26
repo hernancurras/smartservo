@@ -1,0 +1,155 @@
+//Get a String by Serial USB, & run a single LM298 to command the Sailwinch, and a Servo for rudder direction.
+//A0 is a potentiometer multiturn of 10k lineal
+//SetRudder(99)\n (99 is an angle between 0-180 for a servo, 90 is the initial angle, centered.)
+//SetWinch(99)\n (99 is a percentage between 0%-99% of the sailwinch travel)
+
+#include <Servo.h>
+
+Servo rudder;  // create servo object to control a servo
+
+String inputString = "";         // a String to hold incoming data
+bool stringComplete = false;  // whether the string is complete
+int xf, xo, distance = 0;
+int angle = 90, newangle;
+String value = "";
+
+int const MAXSPEED = 255; //PWM Max Speed with 11.1v power
+int const TOLERANCE = 5; // 10% of tolerance between distance(xo-xf) stops the sailwinch
+
+// Sailwinch Driver ports
+int ENA = 6;
+int IN1 = 4;
+int IN2 = 5;
+
+unsigned long intervalwinch = 500; //waits a 1/2 sec between servo refresh
+unsigned long intervalrudder = 250; //waits a 1/2 sec between servo refresh
+unsigned long previousMillisrudder, previousMilliswinch = 0; // millis() returns an unsigned long.
+
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Starting Smart Servo Unit...[OK]");
+
+  rudder.attach(10);  // attaches the servo Object to a Digital port
+
+  //Init Sailwinch Driver LM298d
+  pinMode (ENA, OUTPUT);
+  pinMode (IN1, OUTPUT);
+  pinMode (IN2, OUTPUT);
+
+  // reserve 50 bytes for the inputString:
+  inputString.reserve(50);
+}
+
+void ForwardWinch (int speed)
+{
+ digitalWrite (IN1, HIGH);
+ digitalWrite (IN2, LOW);
+ analogWrite (ENA, speed);
+}
+
+void BackwardWinch (int speed)
+{
+ digitalWrite (IN1, LOW);
+ digitalWrite (IN2, HIGH);
+ analogWrite (ENA, speed);
+}
+
+void StopWinch ()
+{
+ digitalWrite (IN1, LOW);
+ digitalWrite (IN2, LOW);
+ //analogWrite (ENA, 0);
+}
+
+void loop() {
+
+  int firstClosingBracket, secondClosingBracket = 0;
+  unsigned long currentMillis = millis(); // save the current time
+
+  // print the string when a newline arrives:
+  if (stringComplete) {
+  Serial.println(inputString);
+
+  if (inputString.startsWith("SetRudder(") || inputString.startsWith("SetWinch(")) {
+  firstClosingBracket = inputString.indexOf('(') + 1;
+  secondClosingBracket = inputString.indexOf(')');
+  //  Serial.println(firstClosingBracket);
+  //  Serial.println(secondClosingBracket);
+  }
+
+  if (inputString.startsWith("SetWinch(")) {
+
+    value = (inputString.substring(firstClosingBracket,secondClosingBracket));
+    xf = value.toInt();
+
+    Serial.print("Set Sailwinch from (xo): ");Serial.print(xo);
+    Serial.print(" to (xf): ");Serial.println(xf);
+  }
+
+  if (inputString.startsWith("SetRudder(")) {
+
+    value = (inputString.substring(firstClosingBracket,secondClosingBracket));
+    newangle = value.toInt();
+
+    Serial.print("Set Rudder Angle (angle): ");Serial.print(angle);
+    Serial.print(" to (newangle): ");Serial.println(newangle);
+  }
+
+    // clear the string to receive a new message
+    inputString = "";
+    value = "";
+    stringComplete = false;
+  }
+
+  //Set Winch
+  if ((unsigned long)(currentMillis - previousMilliswinch) >= intervalwinch) {
+
+  xo = map(analogRead(A3), 0, 1024, 0, 100);
+
+  // Strategy -> if it is far away distance = abs(x0-xf), set 100% speed,
+  //                    if it is 20% closer, set 3/4 speed
+  //                          if it is 5% or less, stop the winch.
+
+      if ( abs(xo-xf) > TOLERANCE) {
+        if (xo < xf) {
+          ForwardWinch(MAXSPEED);
+          Serial.println(" >>Forward"); //green led should turn on here
+        }
+        else {
+          BackwardWinch(MAXSPEED);
+          Serial.println(" <<Backward"); //red led should turn on here
+        }
+      }
+      else {
+        StopWinch();
+        Serial.println(" ||Stop"); //yellow led should turn on here
+      }
+
+      previousMilliswinch = millis();
+      //you can calculate the time here to set a new intervalwinch, considering dist(xo,xf) to wait a new command to move the sailwinch
+      //is a must since the sailwinch travel are large.
+    }
+
+  //Set Rudder
+  if ((unsigned long)(currentMillis - previousMillisrudder) >= intervalrudder) {
+    rudder.write(newangle);
+    previousMillisrudder = millis();
+    //you can calculate the time here to set a new intervalrudder, considering dist(angle,newangle) to wait a new command to move the servo
+    //probably not needed to prevent commands latency on the rudder.
+    angle = newangle;
+  }
+
+}
+
+void serialEvent() {
+  while (Serial.available()) {
+    // get the new byte:
+    char inChar = (char)Serial.read();
+    // add it to the inputString:
+    inputString += inChar;
+    // if the incoming character is a newline, set a flag so the main loop can, do something about it:
+    if (inChar == '\n') {
+      stringComplete = true;
+    }
+  }
+}
