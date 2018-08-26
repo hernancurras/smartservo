@@ -1,4 +1,5 @@
 # smartservo
+A project to command autonomous sailboats rudder & sailwinch actuators by USB. 
 
 # i. Components:
 - Arduino (328 processor, or better)
