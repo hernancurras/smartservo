@@ -19,12 +19,18 @@ Receive a String by Serial USB, and set a value for the sailwinch or the servo r
 99 is a percentage between 0%-99% of the sailwinch travel.
 The percentage feedback is a [POT10K] placed on the return pulley.
 
-# iv. TO DO (Pending Milestones): 
-+ No endpoints calculation or endpoints switchs were set.
-+ Set a Speed strategy for the sailwinch
-      Strategy -> if it is far away distance = abs(x0-xf), set 100% speed,
-            if it is 20% closer, set 3/4 speed.
-                  if it is 5% or less, stop the Winch.
-+ Set led green/yellow/red, as a semaphore, to determine the Winch operation.
-+ Review the 250ms (4Hz refresh rate) interval rate for the Rudder. (intervalrudder = 250)
-+ Review the 500ms (2Hz refresh rate) interval rate for the Winch. (intervalwinch = 500)
+# iv. In this release:
++ Read Receiver channel #1 (Sailwinch), channel #3 (Rudder), channel #5 AUX (Mode) with interruptions.
++ Set a Speed strategy for the sailwinch.
++ Set CONST settings to setup the boat. (ENDPOINTS, PORTS)
++ Set MIN/MAX validation values received from serial
++ Set the BUILT-IN LED while actuators are working
++ 50Hz refresh rate interval rate for the Rudder. (intervalrudder = 20ms)
++ 5Hz refresh rate interval rate for the Winch. (intervalwinch = 200ms)
+
+# v. TO DO (Pending Milestones): 
++ Endpoints switchs were set.
++ Code Organization
++ Some functions must be created to reduce code
+
+
